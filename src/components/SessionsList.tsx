@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface SessionWithAgent {
   id: string;
@@ -54,11 +55,11 @@ export function SessionsList({ taskId }: SessionsListProps) {
       case 'active':
         return <Circle className="w-4 h-4 text-green-500 fill-current animate-pulse" />;
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-mc-accent" />;
+        return <CheckCircle className="w-4 h-4 text-primary" />;
       case 'failed':
         return <XCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <Circle className="w-4 h-4 text-mc-text-secondary" />;
+        return <Circle className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -125,14 +126,14 @@ export function SessionsList({ taskId }: SessionsListProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-mc-text-secondary">Loading sessions...</div>
+        <div className="text-muted-foreground">Loading sessions...</div>
       </div>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
+      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
         <div className="text-4xl mb-2">🤖</div>
         <p>No sub-agent sessions yet</p>
       </div>
@@ -144,14 +145,14 @@ export function SessionsList({ taskId }: SessionsListProps) {
       {sessions.map((session) => (
         <div
           key={session.id}
-          className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border"
+          className="flex gap-3 rounded-xl border border-border/60 bg-background/70 p-4 shadow-sm"
         >
           {/* Agent Avatar */}
           <div className="flex-shrink-0">
             {session.agent_avatar_emoji ? (
               <span className="text-2xl">{session.agent_avatar_emoji}</span>
             ) : (
-              <Bot className="w-8 h-8 text-mc-accent" />
+              <Bot className="w-8 h-8 text-primary" />
             )}
           </div>
 
@@ -160,21 +161,21 @@ export function SessionsList({ taskId }: SessionsListProps) {
             {/* Agent name and status */}
             <div className="flex items-center gap-2 mb-1">
               {getStatusIcon(session.status)}
-              <span className="font-medium text-mc-text">
+              <span className="font-medium">
                 {session.agent_name || 'Sub-Agent'}
               </span>
-              <span className="text-xs text-mc-text-secondary capitalize">
+              <span className="text-xs text-muted-foreground capitalize">
                 {session.status}
               </span>
             </div>
 
             {/* Session ID */}
-            <div className="text-xs text-mc-text-secondary font-mono mb-2 truncate">
+            <div className="text-xs text-muted-foreground font-mono mb-2 truncate">
               Session: {session.openclaw_session_id}
             </div>
 
             {/* Duration and timestamps */}
-            <div className="flex items-center gap-3 text-xs text-mc-text-secondary">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>
                 Duration: {formatDuration(session.created_at, session.ended_at)}
               </span>
@@ -184,7 +185,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
 
             {/* Channel */}
             {session.channel && (
-              <div className="mt-2 text-xs text-mc-text-secondary">
+              <div className="mt-2 text-xs text-muted-foreground">
                 Channel: <span className="font-mono">{session.channel}</span>
               </div>
             )}
@@ -193,21 +194,23 @@ export function SessionsList({ taskId }: SessionsListProps) {
           {/* Action Buttons */}
           <div className="flex flex-col gap-1">
             {session.status === 'active' && (
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => handleMarkComplete(session.openclaw_session_id)}
-                className="p-1.5 hover:bg-mc-bg-tertiary rounded text-green-500"
                 title="Mark as complete"
               >
                 <Check className="w-4 h-4" />
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => handleDelete(session.openclaw_session_id)}
-              className="p-1.5 hover:bg-mc-bg-tertiary rounded text-red-500"
               title="Delete session"
             >
               <Trash2 className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
       ))}

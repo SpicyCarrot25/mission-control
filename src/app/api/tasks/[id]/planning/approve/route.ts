@@ -59,7 +59,7 @@ function generateSpecMarkdown(task: { title: string; description?: string }, que
   return lines.join('\n');
 }
 
-// POST /api/tasks/[id]/planning/approve - Lock spec and move to inbox
+// POST /api/tasks/[id]/planning/approve - Lock spec and move to backlog
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -112,10 +112,10 @@ export async function POST(
       VALUES (?, ?, ?, datetime('now'))
     `).run(specId, taskId, specMarkdown);
 
-    // Update task description with spec and move to inbox
+    // Update task description with spec and move to backlog
     getDb().prepare(`
       UPDATE tasks 
-      SET description = ?, status = 'inbox', updated_at = datetime('now')
+      SET description = ?, status = 'backlog', updated_at = datetime('now')
       WHERE id = ?
     `).run(specMarkdown, taskId);
 
@@ -123,7 +123,7 @@ export async function POST(
     const activityId = crypto.randomUUID();
     getDb().prepare(`
       INSERT INTO task_activities (id, task_id, activity_type, message)
-      VALUES (?, ?, 'status_changed', 'Planning complete - spec locked and moved to inbox')
+      VALUES (?, ?, 'status_changed', 'Planning complete - spec locked and moved to backlog')
     `).run(activityId, taskId);
 
     // Get the created spec

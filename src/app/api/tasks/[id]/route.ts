@@ -26,6 +26,12 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
+    if (task) {
+      (task as Task & { subtasks?: Array<{ text: string; done: boolean }> }).subtasks = task.subtasks
+        ? JSON.parse(task.subtasks as unknown as string)
+        : [];
+    }
+
     return NextResponse.json(task);
   } catch (error) {
     console.error('Failed to fetch task:', error);
@@ -80,6 +86,22 @@ export async function PATCH(
       updates.push('priority = ?');
       values.push(body.priority);
     }
+    if (body.owner !== undefined) {
+      updates.push('owner = ?');
+      values.push(body.owner);
+    }
+    if (body.blockers !== undefined) {
+      updates.push('blockers = ?');
+      values.push(body.blockers);
+    }
+    if (body.subtasks !== undefined) {
+      updates.push('subtasks = ?');
+      values.push(JSON.stringify(body.subtasks || []));
+    }
+    if (body.project_tag !== undefined) {
+      updates.push('project_tag = ?');
+      values.push(body.project_tag);
+    }
     if (body.due_date !== undefined) {
       updates.push('due_date = ?');
       values.push(body.due_date);
@@ -93,8 +115,8 @@ export async function PATCH(
       updates.push('status = ?');
       values.push(body.status);
 
-      // Auto-dispatch when moving to assigned
-      if (body.status === 'assigned' && existing.assigned_agent_id) {
+      // Auto-dispatch when moving to in progress
+      if (body.status === 'in_progress' && existing.assigned_agent_id) {
         shouldDispatch = true;
       }
 
@@ -122,7 +144,7 @@ export async function PATCH(
           );
 
           // Auto-dispatch if already in assigned status or being assigned now
-          if (existing.status === 'assigned' || body.status === 'assigned') {
+          if (existing.status === 'in_progress' || body.status === 'in_progress') {
             shouldDispatch = true;
           }
         }
@@ -155,6 +177,9 @@ export async function PATCH(
 
     // Broadcast task update via SSE
     if (task) {
+      (task as Task & { subtasks?: Array<{ text: string; done: boolean }> }).subtasks = task.subtasks
+        ? JSON.parse(task.subtasks as unknown as string)
+        : [];
       broadcast({
         type: 'task_updated',
         payload: task,

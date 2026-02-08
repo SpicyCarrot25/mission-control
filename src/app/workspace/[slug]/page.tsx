@@ -13,6 +13,8 @@ import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { Task, Workspace } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -26,10 +28,12 @@ export default function WorkspacePage() {
     setIsOnline,
     setIsLoading,
     isLoading,
+    tasks,
   } = useMissionControl();
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [activeView, setActiveView] = useState<'dashboard' | 'board'>('dashboard');
 
   // Connect to SSE for real-time updates
   useSSE();
@@ -168,16 +172,16 @@ export default function WorkspacePage() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">🔍</div>
           <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
-          <p className="text-mc-text-secondary mb-6">
+          <p className="text-muted-foreground mb-6">
             The workspace &ldquo;{slug}&rdquo; doesn&apos;t exist.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard
@@ -189,17 +193,22 @@ export default function WorkspacePage() {
 
   if (isLoading || !workspace) {
     return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4 animate-pulse">🦞</div>
-          <p className="text-mc-text-secondary">Loading {slug}...</p>
+          <p className="text-muted-foreground">Loading {slug}...</p>
         </div>
       </div>
     );
   }
 
+  const totalTasks = tasks.length;
+  const inProgress = tasks.filter((task) => task.status === 'in_progress').length;
+  const done = tasks.filter((task) => task.status === 'done').length;
+  const blocked = tasks.filter((task) => task.blockers && task.blockers.trim().length > 0).length;
+
   return (
-    <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header
         workspace={workspace}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
@@ -216,7 +225,7 @@ export default function WorkspacePage() {
 
         {/* Agents Sidebar */}
         <div
-          className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 md:static md:translate-x-0 md:z-auto md:flex-shrink-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 md:static md:translate-x-0 md:z-auto md:flex-shrink-0 ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -224,7 +233,78 @@ export default function WorkspacePage() {
         </div>
 
         {/* Main Content Area */}
-        <MissionQueue workspaceId={workspace.id} />
+        <div className="flex-1 overflow-hidden">
+          {activeView === 'dashboard' ? (
+            <div className="h-full overflow-y-auto px-4 py-6">
+              <div className="mx-auto max-w-5xl space-y-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Overview</p>
+                    <h2 className="text-2xl font-semibold">Mission Pulse</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Track what is moving and unblock your next push.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setActiveView('board')}>
+                      Open Board
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm text-muted-foreground">Total Tasks</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-semibold">{totalTasks}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm text-muted-foreground">In Progress</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-semibold text-primary">{inProgress}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm text-muted-foreground">Done</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-semibold">{done}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm text-muted-foreground">Blocked</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-semibold text-destructive">{blocked}</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="border-dashed border-border/60 bg-card/40">
+                  <CardContent className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                    <div className="text-4xl">🧭</div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Ready to move work?</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Jump into the board to prioritize and drag tasks across phases.
+                      </p>
+                    </div>
+                    <Button onClick={() => setActiveView('board')}>Go to Kanban</Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : (
+            <MissionQueue workspaceId={workspace.id} onBackToOverview={() => setActiveView('dashboard')} />
+          )}
+        </div>
 
         {/* Live Feed */}
         <LiveFeed />

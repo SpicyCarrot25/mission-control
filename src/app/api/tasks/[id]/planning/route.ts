@@ -221,7 +221,7 @@ Respond with ONLY valid JSON in this format:
     
     getDb().prepare(`
       UPDATE tasks 
-      SET planning_session_key = ?, planning_messages = ?, status = 'planning'
+      SET planning_session_key = ?, planning_messages = ?
       WHERE id = ?
     `).run(sessionKey, JSON.stringify(messages), taskId);
 

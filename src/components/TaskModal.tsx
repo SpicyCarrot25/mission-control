@@ -1,16 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Save, Trash2, Plus } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
-import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type TabType = 'overview' | 'planning' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'activity' | 'deliverables' | 'sessions';
 
 interface TaskModalProps {
   task?: Task;
@@ -18,25 +26,55 @@ interface TaskModalProps {
   workspaceId?: string;
 }
 
+const statusOptions: { value: TaskStatus; label: string }[] = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'done', label: 'Done' },
+];
+
+const priorityOptions: { value: TaskPriority; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
+];
+
+const parseProjectTag = (value?: string) => {
+  if (!value) return { label: 'General', color: '#f97316' };
+  if (value.includes('|')) {
+    const [label, color] = value.split('|');
+    return { label: label || 'General', color: color || '#f97316' };
+  }
+  return { label: value, color: '#f97316' };
+};
+
 export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAgentModal, setShowAgentModal] = useState(false);
-  const [usePlanningMode, setUsePlanningMode] = useState(false);
-  // Auto-switch to planning tab if task is in planning status
-  const [activeTab, setActiveTab] = useState<TabType>(task?.status === 'planning' ? 'planning' : 'overview');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  const initialTag = useMemo(() => parseProjectTag(task?.project_tag), [task?.project_tag]);
 
   const [form, setForm] = useState({
     title: task?.title || '',
     description: task?.description || '',
-    priority: task?.priority || 'normal' as TaskPriority,
-    status: task?.status || 'inbox' as TaskStatus,
+    priority: (task?.priority || 'normal') as TaskPriority,
+    status: (task?.status || 'backlog') as TaskStatus,
+    owner: task?.owner || '',
+    blockers: task?.blockers || '',
+    subtasks: task?.subtasks || [],
+    projectTagLabel: initialTag.label,
+    projectTagColor: initialTag.color,
     assigned_agent_id: task?.assigned_agent_id || '',
     due_date: task?.due_date || '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const projectTagValue = `${form.projectTagLabel || 'General'}|${form.projectTagColor || '#f97316'}`;
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setIsSubmitting(true);
 
     try {
@@ -44,9 +82,14 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
       const method = task ? 'PATCH' : 'POST';
 
       const payload = {
-        ...form,
-        // If planning mode is enabled for new tasks, override status to 'planning'
-        status: (!task && usePlanningMode) ? 'planning' : form.status,
+        title: form.title,
+        description: form.description,
+        priority: form.priority,
+        status: form.status,
+        owner: form.owner || null,
+        blockers: form.blockers || null,
+        subtasks: form.subtasks,
+        project_tag: projectTagValue,
         assigned_agent_id: form.assigned_agent_id || null,
         due_date: form.due_date || null,
         workspace_id: workspaceId || task?.workspace_id || 'default',
@@ -60,7 +103,6 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
 
       if (res.ok) {
         const savedTask = await res.json();
-
         if (task) {
           updateTask(savedTask);
           onClose();
@@ -73,26 +115,6 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
             message: `New task: ${savedTask.title}`,
             created_at: new Date().toISOString(),
           });
-
-          // If planning mode is enabled, auto-generate questions and keep modal open
-          if (usePlanningMode) {
-            // Trigger question generation in background
-            fetch(`/api/tasks/${savedTask.id}/planning`, { method: 'POST' })
-              .then(() => {
-                // Update our local task reference and switch to planning tab
-                updateTask({ ...savedTask, status: 'planning' });
-              })
-              .catch(console.error);
-            
-            // Log the planning start
-            addEvent({
-              id: crypto.randomUUID(),
-              type: 'task_status_changed',
-              task_id: savedTask.id,
-              message: `📋 Planning started for: ${savedTask.title}`,
-              created_at: new Date().toISOString(),
-            });
-          }
           onClose();
         }
       }
@@ -119,258 +141,276 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
     }
   };
 
-  const statuses: TaskStatus[] = ['planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'done'];
-  const priorities: TaskPriority[] = ['low', 'normal', 'high', 'urgent'];
-
-  const tabs = [
-    { id: 'overview' as TabType, label: 'Overview', icon: null },
-    { id: 'planning' as TabType, label: 'Planning', icon: <ClipboardList className="w-4 h-4" /> },
-    { id: 'activity' as TabType, label: 'Activity', icon: <Activity className="w-4 h-4" /> },
-    { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
-    { id: 'sessions' as TabType, label: 'Sessions', icon: <Bot className="w-4 h-4" /> },
-  ];
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-none sm:rounded-lg w-full h-full sm:h-auto max-w-2xl sm:max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
-          <h2 className="text-base sm:text-lg font-semibold">
-            {task ? task.title : 'Create New Task'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Tabs - only show for existing tasks */}
-        {task && (
-          <div className="flex border-b border-mc-border flex-shrink-0 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'text-mc-accent border-b-2 border-mc-accent'
-                    : 'text-mc-text-secondary hover:text-mc-text'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="h-[100dvh] w-screen max-w-none p-0 !left-0 !top-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:h-auto sm:max-w-4xl sm:rounded-2xl">
+        <DialogHeader className="border-b border-border/60 px-6 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <DialogTitle>{task ? task.title : 'Create New Task'}</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {task ? 'Update details and keep the team aligned.' : 'Define the work before it hits the board.'}
+              </p>
+            </div>
+            <Badge className="rounded-full" variant="default">
+              {form.status.replace('_', ' ')}
+            </Badge>
           </div>
-        )}
+        </DialogHeader>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-              className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-              placeholder="What needs to be done?"
-            />
-          </div>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)} className="flex h-full flex-col">
+          {task && (
+            <TabsList className="mx-6 mt-4 w-fit">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
+              <TabsTrigger value="sessions">Sessions</TabsTrigger>
+            </TabsList>
+          )}
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={3}
-              className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-              placeholder="Add details..."
-            />
-          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            <TabsContent value="overview">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input
+                      id="title"
+                      value={form.title}
+                      onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      placeholder="What needs to be done?"
+                      required
+                    />
+                  </div>
 
-          {/* Planning Mode Toggle - only for new tasks */}
-          {!task && (
-            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={usePlanningMode}
-                  onChange={(e) => setUsePlanningMode(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-mc-border"
-                />
-                <div>
-                  <span className="font-medium text-sm flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-mc-accent" />
-                    Enable Planning Mode
-                  </span>
-                  <p className="text-xs text-mc-text-secondary mt-1">
-                    Best for complex projects that need detailed requirements. 
-                    You&apos;ll answer a few questions to define scope, goals, and constraints 
-                    before work begins. Skip this for quick, straightforward tasks.
-                  </p>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      placeholder="Add context, links, and acceptance criteria."
+                      rows={4}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={form.status}
+                      onValueChange={(value) => setForm({ ...form, status: value as TaskStatus })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select
+                      value={form.priority}
+                      onValueChange={(value) => setForm({ ...form, priority: value as TaskPriority })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {priorityOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Owner</Label>
+                    <Input
+                      value={form.owner}
+                      onChange={(e) => setForm({ ...form, owner: e.target.value })}
+                      placeholder="Franc, Nix, or team member"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assign to Agent</Label>
+                    <Select
+                      value={form.assigned_agent_id || 'unassigned'}
+                      onValueChange={(value) => {
+                        if (value === '__add_new__') {
+                          setShowAgentModal(true);
+                          return;
+                        }
+                        setForm({ ...form, assigned_agent_id: value === 'unassigned' ? '' : value });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {agents.map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.avatar_emoji} {agent.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__add_new__">Add new agent…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <Input
+                      type="datetime-local"
+                      value={form.due_date}
+                      onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Blockers</Label>
+                    <Textarea
+                      value={form.blockers}
+                      onChange={(e) => setForm({ ...form, blockers: e.target.value })}
+                      placeholder="What needs to happen before this can move?"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-3 md:col-span-2">
+                    <Label>Subtasks</Label>
+                    <div className="space-y-2">
+                      {form.subtasks.map((subtask, index) => (
+                        <div key={`${subtask.text}-${index}`} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                          <Checkbox
+                            checked={subtask.done}
+                            onCheckedChange={(checked) => {
+                              const updated = [...form.subtasks];
+                              updated[index] = { ...subtask, done: Boolean(checked) };
+                              setForm({ ...form, subtasks: updated });
+                            }}
+                          />
+                          <Input
+                            value={subtask.text}
+                            onChange={(e) => {
+                              const updated = [...form.subtasks];
+                              updated[index] = { ...subtask, text: e.target.value };
+                              setForm({ ...form, subtasks: updated });
+                            }}
+                            className="h-9"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const updated = form.subtasks.filter((_, i) => i !== index);
+                              setForm({ ...form, subtasks: updated });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          subtasks: [...form.subtasks, { text: '', done: false }],
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add subtask
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Project Tag</Label>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <Input
+                        value={form.projectTagLabel}
+                        onChange={(e) => setForm({ ...form, projectTagLabel: e.target.value })}
+                        placeholder="General"
+                      />
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={form.projectTagColor}
+                          onChange={(e) => setForm({ ...form, projectTagColor: e.target.value })}
+                          className="h-10 w-12 rounded-md border border-border/60 bg-background p-1"
+                        />
+                        <span className="text-xs text-muted-foreground">Dot color on cards</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </label>
-            </div>
-          )}
+              </form>
+            </TabsContent>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Status */}
+            {task && (
+              <>
+                <TabsContent value="activity">
+                  <ActivityLog taskId={task.id} />
+                </TabsContent>
+                <TabsContent value="deliverables">
+                  <DeliverablesList taskId={task.id} />
+                </TabsContent>
+                <TabsContent value="sessions">
+                  <SessionsList taskId={task.id} />
+                </TabsContent>
+              </>
+            )}
+          </div>
+        </Tabs>
+
+        <DialogFooter className="border-t border-border/60 px-6 py-4">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s.replace('_', ' ').toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Priority */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-              >
-                {priorities.map((p) => (
-                  <option key={p} value={p}>
-                    {p.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Assigned Agent */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Assign to</label>
-            <select
-              value={form.assigned_agent_id}
-              onChange={(e) => {
-                if (e.target.value === '__add_new__') {
-                  setShowAgentModal(true);
-                } else {
-                  setForm({ ...form, assigned_agent_id: e.target.value });
-                }
-              }}
-              className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-            >
-              <option value="">Unassigned</option>
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.avatar_emoji} {agent.name} - {agent.role}
-                </option>
-              ))}
-              <option value="__add_new__" className="text-mc-accent">
-                ➕ Add new agent...
-              </option>
-            </select>
-          </div>
-
-          {/* Due Date */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Due Date</label>
-            <input
-              type="datetime-local"
-              value={form.due_date}
-              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-              className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-            />
-          </div>
-            </form>
-          )}
-
-          {/* Planning Tab */}
-          {activeTab === 'planning' && task && (
-            <PlanningTab 
-              taskId={task.id} 
-              onSpecLocked={() => {
-                // Refresh task data when spec is locked
-                window.location.reload();
-              }}
-            />
-          )}
-
-          {/* Activity Tab */}
-          {activeTab === 'activity' && task && (
-            <ActivityLog taskId={task.id} />
-          )}
-
-          {/* Deliverables Tab */}
-          {activeTab === 'deliverables' && task && (
-            <DeliverablesList taskId={task.id} />
-          )}
-
-          {/* Sessions Tab */}
-          {activeTab === 'sessions' && task && (
-            <SessionsList taskId={task.id} />
-          )}
-        </div>
-
-        {/* Footer - only show on overview tab */}
-        {activeTab === 'overview' && (
-          <div className="flex items-center justify-between p-4 border-t border-mc-border flex-shrink-0">
-            <div className="flex gap-2">
               {task && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
-                </>
+                <Button type="button" variant="destructive" onClick={handleDelete}>
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
               )}
             </div>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
-              >
+              <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
+              </Button>
+              <Button type="button" onClick={() => handleSubmit()} disabled={isSubmitting}>
+                <Save className="h-4 w-4" />
                 {isSubmitting ? 'Saving...' : 'Save'}
-              </button>
+              </Button>
             </div>
           </div>
-        )}
-      </div>
+        </DialogFooter>
+      </DialogContent>
 
-      {/* Nested Agent Modal for inline agent creation */}
       {showAgentModal && (
         <AgentModal
           workspaceId={workspaceId}
           onClose={() => setShowAgentModal(false)}
           onAgentCreated={(agentId) => {
-            // Auto-select the newly created agent
             setForm({ ...form, assigned_agent_id: agentId });
             setShowAgentModal(false);
           }}
         />
       )}
-    </div>
+    </Dialog>
   );
 }

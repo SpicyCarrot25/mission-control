@@ -1,312 +1,215 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ChevronRight, GripVertical } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { Plus, GripVertical, AlertTriangle, CheckSquare } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { useMissionControl } from '@/lib/store';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
-import { formatDistanceToNow } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface MissionQueueProps {
   workspaceId?: string;
+  onBackToOverview?: () => void;
 }
 
-const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'planning', label: '📋 PLANNING', color: 'border-t-mc-accent-purple' },
-  { id: 'inbox', label: 'INBOX', color: 'border-t-mc-accent-pink' },
-  { id: 'assigned', label: 'ASSIGNED', color: 'border-t-mc-accent-yellow' },
-  { id: 'in_progress', label: 'IN PROGRESS', color: 'border-t-mc-accent' },
-  { id: 'testing', label: 'TESTING', color: 'border-t-mc-accent-cyan' },
-  { id: 'review', label: 'REVIEW', color: 'border-t-mc-accent-purple' },
-  { id: 'done', label: 'DONE', color: 'border-t-mc-accent-green' },
+const COLUMNS: { id: TaskStatus; label: string; description: string }[] = [
+  { id: 'backlog', label: 'Backlog', description: 'Ready to be pulled' },
+  { id: 'in_progress', label: 'In Progress', description: 'Currently being built' },
+  { id: 'review', label: 'Review', description: 'Needs approval' },
+  { id: 'done', label: 'Done', description: 'Shipped' },
 ];
 
-export function MissionQueue({ workspaceId }: MissionQueueProps) {
+const parseProjectTag = (value?: string) => {
+  if (!value) return { label: 'General', color: '#f97316' };
+  if (value.includes('|')) {
+    const [label, color] = value.split('|');
+    return { label: label || 'General', color: color || '#f97316' };
+  }
+  return { label: value, color: '#f97316' };
+};
+
+export function MissionQueue({ workspaceId, onBackToOverview }: MissionQueueProps) {
   const { tasks, updateTaskStatus, addEvent } = useMissionControl();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const [activeColumnIndex, setActiveColumnIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   const getTasksByStatus = (status: TaskStatus) =>
     tasks.filter((task) => task.status === status);
 
-  const handleDragStart = (e: React.DragEvent, task: Task) => {
-    setDraggedTask(task);
-    e.dataTransfer.effectAllowed = 'move';
-  };
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId) return;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
+    const targetStatus = destination.droppableId as TaskStatus;
+    const movedTask = tasks.find((t) => t.id === draggableId);
+    if (!movedTask || movedTask.status === targetStatus) return;
 
-  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    if (!draggedTask || draggedTask.status === targetStatus) {
-      setDraggedTask(null);
-      return;
-    }
+    updateTaskStatus(draggableId, targetStatus);
 
-    // Optimistic update
-    updateTaskStatus(draggedTask.id, targetStatus);
-
-    // Persist to API
     try {
-      const res = await fetch(`/api/tasks/${draggedTask.id}`, {
+      const res = await fetch(`/api/tasks/${draggableId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: targetStatus }),
       });
 
       if (res.ok) {
-        // Add event
         addEvent({
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
-          task_id: draggedTask.id,
-          message: `Task "${draggedTask.title}" moved to ${targetStatus}`,
+          task_id: draggableId,
+          message: `Task "${movedTask.title}" moved to ${targetStatus}`,
           created_at: new Date().toISOString(),
         });
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
-      // Revert on error
-      updateTaskStatus(draggedTask.id, draggedTask.status);
+      updateTaskStatus(draggableId, movedTask.status);
     }
-
-    setDraggedTask(null);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0]?.clientX ?? null);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null) return;
-    const endX = e.changedTouches[0]?.clientX ?? touchStartX;
-    const delta = endX - touchStartX;
-    const threshold = 60;
-    if (Math.abs(delta) > threshold) {
-      if (delta < 0 && activeColumnIndex < COLUMNS.length - 1) {
-        setActiveColumnIndex(activeColumnIndex + 1);
-      }
-      if (delta > 0 && activeColumnIndex > 0) {
-        setActiveColumnIndex(activeColumnIndex - 1);
-      }
-    }
-    setTouchStartX(null);
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="p-3 border-b border-mc-border flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+        <div>
+          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Mission Queue</p>
+          <h2 className="text-lg font-semibold">Kanban</h2>
+        </div>
         <div className="flex items-center gap-2">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
-          <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
-        >
-          <Plus className="w-4 h-4" />
-          New Task
-        </button>
-      </div>
-
-      {/* Mobile Kanban Tabs */}
-      <div className="md:hidden border-b border-mc-border">
-        <div className="flex gap-2 px-3 py-2 overflow-x-auto">
-          {COLUMNS.map((column, index) => {
-            const columnTasks = getTasksByStatus(column.id);
-            const isActive = index === activeColumnIndex;
-            return (
-              <button
-                key={column.id}
-                onClick={() => setActiveColumnIndex(index)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium uppercase whitespace-nowrap ${
-                  isActive
-                    ? 'bg-mc-accent text-mc-bg'
-                    : 'bg-mc-bg-tertiary text-mc-text-secondary'
-                }`}
-              >
-                <span>{column.label}</span>
-                <span className="bg-black/20 text-[10px] px-2 py-0.5 rounded-full">
-                  {columnTasks.length}
-                </span>
-              </button>
-            );
-          })}
+          {onBackToOverview && (
+            <Button variant="outline" size="sm" onClick={onBackToOverview}>
+              Overview
+            </Button>
+          )}
+          <Button onClick={() => setShowCreateModal(true)} size="sm">
+            <Plus className="h-4 w-4" />
+            New Task
+          </Button>
         </div>
       </div>
 
-      {/* Mobile Kanban Column */}
-      <div
-        className="md:hidden flex-1 p-3 overflow-hidden"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {COLUMNS.map((column, index) => {
-          if (index !== activeColumnIndex) return null;
-          const columnTasks = getTasksByStatus(column.id);
-          return (
-            <div
-              key={column.id}
-              className={`h-full flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 ${column.color}`}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, column.id)}
-            >
-              <div className="p-3 border-b border-mc-border flex items-center justify-between">
-                <span className="text-xs font-medium uppercase text-mc-text-secondary">
-                  {column.label}
-                </span>
-                <span className="text-xs bg-mc-bg-tertiary px-2 py-0.5 rounded text-mc-text-secondary">
-                  {columnTasks.length}
-                </span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onDragStart={handleDragStart}
-                    onClick={() => setEditingTask(task)}
-                    isDragging={draggedTask?.id === task.id}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex-1 overflow-x-auto px-4 py-4">
+          <div className="flex gap-4 min-w-max snap-x snap-mandatory">
+            {COLUMNS.map((column) => {
+              const columnTasks = getTasksByStatus(column.id);
+              return (
+                <Droppable droppableId={column.id} key={column.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={cn(
+                        'flex w-[280px] flex-col rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur',
+                        snapshot.isDraggingOver && 'border-primary/60 shadow-lg'
+                      )}
+                    >
+                      <div className="border-b border-border/60 px-4 py-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold">{column.label}</p>
+                            <p className="text-xs text-muted-foreground">{column.description}</p>
+                          </div>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            {columnTasks.length}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-3 p-4">
+                        {columnTasks.map((task, index) => (
+                          <Draggable draggableId={task.id} index={index} key={task.id}>
+                            {(dragProvided, dragSnapshot) => (
+                              <div
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                className={cn(
+                                  'rounded-xl border border-border/60 bg-background/80 p-4 shadow-sm transition hover:shadow-md',
+                                  dragSnapshot.isDragging && 'shadow-lg'
+                                )}
+                                onClick={() => setEditingTask(task)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full"
+                                      style={{ backgroundColor: parseProjectTag(task.project_tag).color }}
+                                    />
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {parseProjectTag(task.project_tag).label}
+                                    </span>
+                                  </div>
+                                  <span
+                                    {...dragProvided.dragHandleProps}
+                                    className="inline-flex items-center justify-center rounded-md border border-border/60 bg-background/70 p-1 text-muted-foreground touch-none"
+                                  >
+                                    <GripVertical className="h-4 w-4" />
+                                  </span>
+                                </div>
 
-      {/* Desktop Kanban Columns */}
-      <div className="hidden md:flex flex-1 gap-3 p-3 overflow-x-auto">
-        {COLUMNS.map((column) => {
-          const columnTasks = getTasksByStatus(column.id);
-          return (
-            <div
-              key={column.id}
-              className={`flex-1 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 ${column.color}`}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, column.id)}
-            >
-              {/* Column Header */}
-              <div className="p-2 border-b border-mc-border flex items-center justify-between">
-                <span className="text-xs font-medium uppercase text-mc-text-secondary">
-                  {column.label}
-                </span>
-                <span className="text-xs bg-mc-bg-tertiary px-2 py-0.5 rounded text-mc-text-secondary">
-                  {columnTasks.length}
-                </span>
-              </div>
+                                <div className="mt-3">
+                                  <h4 className="text-sm font-semibold leading-snug">{task.title}</h4>
+                                  {task.description && (
+                                    <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                                      {task.description}
+                                    </p>
+                                  )}
+                                </div>
 
-              {/* Tasks */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onDragStart={handleDragStart}
-                    onClick={() => setEditingTask(task)}
-                    isDragging={draggedTask?.id === task.id}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {task.owner && (
+                                    <Badge variant="secondary" className="rounded-full">
+                                      {task.owner}
+                                    </Badge>
+                                  )}
+                                  {task.blockers && task.blockers.trim().length > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-destructive">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Blocked
+                                    </span>
+                                  )}
+                                  {task.subtasks && task.subtasks.length > 0 && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <CheckSquare className="h-3 w-3" />
+                                      {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length}
+                                    </span>
+                                  )}
+                                </div>
 
-      {/* Modals */}
+                                <div className="mt-4 flex items-center justify-between text-[11px] text-muted-foreground">
+                                  <span className="capitalize">{task.priority}</span>
+                                  <span>{formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}</span>
+                                </div>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        {columnTasks.length === 0 && (
+                          <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-6 text-center text-xs text-muted-foreground">
+                            Drop tasks here
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Droppable>
+              );
+            })}
+          </div>
+        </div>
+      </DragDropContext>
+
       {showCreateModal && (
         <TaskModal onClose={() => setShowCreateModal(false)} workspaceId={workspaceId} />
       )}
       {editingTask && (
         <TaskModal task={editingTask} onClose={() => setEditingTask(null)} workspaceId={workspaceId} />
       )}
-    </div>
-  );
-}
-
-interface TaskCardProps {
-  task: Task;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
-  onClick: () => void;
-  isDragging: boolean;
-}
-
-function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
-  const priorityStyles = {
-    low: 'text-mc-text-secondary',
-    normal: 'text-mc-accent',
-    high: 'text-mc-accent-yellow',
-    urgent: 'text-mc-accent-red',
-  };
-
-  const priorityDots = {
-    low: 'bg-mc-text-secondary/40',
-    normal: 'bg-mc-accent',
-    high: 'bg-mc-accent-yellow',
-    urgent: 'bg-mc-accent-red',
-  };
-
-  const isPlanning = task.status === 'planning';
-
-  return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart(e, task)}
-      onClick={onClick}
-      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 touch-manipulation active:scale-[0.99] ${
-        isDragging ? 'opacity-50 scale-95' : ''
-      } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
-    >
-      {/* Drag handle bar */}
-      <div className="flex items-center justify-center py-2 border-b border-mc-border/30 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-        <GripVertical className="w-4 h-4 text-mc-text-secondary/50 cursor-grab" />
-      </div>
-
-      {/* Card content */}
-      <div className="p-5 md:p-4">
-        {/* Title */}
-        <h4 className="text-base md:text-sm font-medium leading-snug line-clamp-2 mb-3">
-          {task.title}
-        </h4>
-        
-        {/* Planning mode indicator */}
-        {isPlanning && (
-          <div className="flex items-center gap-2 mb-3 py-2 px-3 bg-purple-500/10 rounded-md border border-purple-500/20">
-            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse flex-shrink-0" />
-            <span className="text-xs text-purple-400 font-medium">Continue planning</span>
-          </div>
-        )}
-
-        {/* Assigned agent */}
-        {task.assigned_agent && (
-          <div className="flex items-center gap-2 mb-3 py-2 px-2 bg-mc-bg-tertiary/50 rounded">
-            <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
-            <span className="text-sm md:text-xs text-mc-text-secondary truncate">
-              {(task.assigned_agent as unknown as { name: string }).name}
-            </span>
-          </div>
-        )}
-
-        {/* Footer: priority + timestamp */}
-        <div className="flex items-center justify-between pt-2 border-t border-mc-border/20">
-          <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${priorityDots[task.priority]}`} />
-            <span className={`text-sm md:text-xs capitalize ${priorityStyles[task.priority]}`}>
-              {task.priority}
-            </span>
-          </div>
-          <span className="text-xs md:text-[10px] text-mc-text-secondary/60">
-            {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

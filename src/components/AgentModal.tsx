@@ -1,9 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Save, Trash2 } from 'lucide-react';
+import { Save, Trash2 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentStatus } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AgentModalProps {
   agent?: Agent;
@@ -15,7 +23,7 @@ interface AgentModalProps {
 const EMOJI_OPTIONS = ['🤖', '🦞', '💻', '🔍', '✍️', '🎨', '📊', '🧠', '⚡', '🚀', '🎯', '🔧'];
 
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: AgentModalProps) {
-  const { addAgent, updateAgent, agents } = useMissionControl();
+  const { addAgent, updateAgent } = useMissionControl();
   const [activeTab, setActiveTab] = useState<'info' | 'soul' | 'user' | 'agents'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -24,7 +32,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     role: agent?.role || '',
     description: agent?.description || '',
     avatar_emoji: agent?.avatar_emoji || '🤖',
-    status: agent?.status || 'standby' as AgentStatus,
+    status: (agent?.status || 'standby') as AgentStatus,
     is_master: agent?.is_master || false,
     soul_md: agent?.soul_md || '',
     user_md: agent?.user_md || '',
@@ -54,7 +62,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
           updateAgent(savedAgent);
         } else {
           addAgent(savedAgent);
-          // Notify parent if callback provided (e.g., for inline agent creation)
           if (onAgentCreated) {
             onAgentCreated(savedAgent.id);
           }
@@ -74,7 +81,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     try {
       const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
       if (res.ok) {
-        // Remove from store
         useMissionControl.setState((state) => ({
           agents: state.agents.filter((a) => a.id !== agent.id),
           selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
@@ -86,218 +92,164 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     }
   };
 
-  const tabs = [
-    { id: 'info', label: 'Info' },
-    { id: 'soul', label: 'SOUL.md' },
-    { id: 'user', label: 'USER.md' },
-    { id: 'agents', label: 'AGENTS.md' },
-  ] as const;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-none sm:rounded-lg w-full h-full sm:h-auto max-w-2xl sm:max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border">
-          <h2 className="text-base sm:text-lg font-semibold">
-            {agent ? `Edit ${agent.name}` : 'Create New Agent'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="h-[100dvh] w-screen max-w-none p-0 !left-0 !top-0 !translate-x-0 !translate-y-0 sm:!left-[50%] sm:!top-[50%] sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:h-auto sm:max-w-3xl sm:rounded-2xl">
+        <DialogHeader className="border-b border-border/60 px-6 py-4">
+          <DialogTitle>{agent ? `Edit ${agent.name}` : 'Create New Agent'}</DialogTitle>
+        </DialogHeader>
 
-        {/* Tabs */}
-        <div className="flex border-b border-mc-border overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-mc-accent text-mc-accent'
-                  : 'border-transparent text-mc-text-secondary hover:text-mc-text'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="flex h-full flex-col">
+          <TabsList className="mx-6 mt-4 w-fit">
+            <TabsTrigger value="info">Info</TabsTrigger>
+            <TabsTrigger value="soul">SOUL.md</TabsTrigger>
+            <TabsTrigger value="user">USER.md</TabsTrigger>
+            <TabsTrigger value="agents">AGENTS.md</TabsTrigger>
+          </TabsList>
 
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4">
-          {activeTab === 'info' && (
-            <div className="space-y-4">
-              {/* Avatar Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Avatar</label>
-                <div className="flex flex-wrap gap-2">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setForm({ ...form, avatar_emoji: emoji })}
-                      className={`text-2xl p-2 rounded hover:bg-mc-bg-tertiary ${
-                        form.avatar_emoji === emoji
-                          ? 'bg-mc-accent/20 ring-2 ring-mc-accent'
-                          : ''
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            <TabsContent value="info">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label>Avatar</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {EMOJI_OPTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setForm({ ...form, avatar_emoji: emoji })}
+                        className={`text-2xl p-2 rounded-lg border ${
+                          form.avatar_emoji === emoji ? 'border-primary bg-primary/10' : 'border-border/60'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="Agent name"
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Name</Label>
+                    <Input
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      required
+                      placeholder="Agent name"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Role</Label>
+                    <Input
+                      value={form.role}
+                      onChange={(e) => setForm({ ...form, role: e.target.value })}
+                      required
+                      placeholder="e.g., Code & Automation"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      rows={3}
+                      placeholder="What does this agent do?"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={form.status}
+                      onValueChange={(value) => setForm({ ...form, status: value as AgentStatus })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Standby" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standby">Standby</SelectItem>
+                        <SelectItem value="working">Working</SelectItem>
+                        <SelectItem value="offline">Offline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                    <Checkbox
+                      checked={form.is_master}
+                      onCheckedChange={(checked) => setForm({ ...form, is_master: Boolean(checked) })}
+                    />
+                    <Label className="text-sm">Master Orchestrator</Label>
+                  </div>
+                </div>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="soul">
+              <div className="space-y-2">
+                <Label>SOUL.md - Agent Personality & Identity</Label>
+                <Textarea
+                  value={form.soul_md}
+                  onChange={(e) => setForm({ ...form, soul_md: e.target.value })}
+                  rows={15}
+                  className="font-mono"
+                  placeholder="# Agent Name\n\nDefine this agent's personality, values, and communication style..."
                 />
               </div>
+            </TabsContent>
 
-              {/* Role */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Role</label>
-                <input
-                  type="text"
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
-                  required
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="e.g., Code & Automation"
+            <TabsContent value="user">
+              <div className="space-y-2">
+                <Label>USER.md - Context About the Human</Label>
+                <Textarea
+                  value={form.user_md}
+                  onChange={(e) => setForm({ ...form, user_md: e.target.value })}
+                  rows={15}
+                  className="font-mono"
+                  placeholder="# User Context\n\nInformation about the human this agent works with..."
                 />
               </div>
+            </TabsContent>
 
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={2}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                  placeholder="What does this agent do?"
+            <TabsContent value="agents">
+              <div className="space-y-2">
+                <Label>AGENTS.md - Team Awareness</Label>
+                <Textarea
+                  value={form.agents_md}
+                  onChange={(e) => setForm({ ...form, agents_md: e.target.value })}
+                  rows={15}
+                  className="font-mono"
+                  placeholder="# Team Roster\n\nInformation about other agents this agent works with..."
                 />
               </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Status</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as AgentStatus })}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  <option value="standby">Standby</option>
-                  <option value="working">Working</option>
-                  <option value="offline">Offline</option>
-                </select>
-              </div>
-
-              {/* Master Toggle */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="is_master"
-                  checked={form.is_master}
-                  onChange={(e) => setForm({ ...form, is_master: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="is_master" className="text-sm">
-                  Master Orchestrator (can coordinate other agents)
-                </label>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'soul' && (
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                SOUL.md - Agent Personality & Identity
-              </label>
-              <textarea
-                value={form.soul_md}
-                onChange={(e) => setForm({ ...form, soul_md: e.target.value })}
-                rows={15}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="# Agent Name&#10;&#10;Define this agent's personality, values, and communication style..."
-              />
-            </div>
-          )}
-
-          {activeTab === 'user' && (
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                USER.md - Context About the Human
-              </label>
-              <textarea
-                value={form.user_md}
-                onChange={(e) => setForm({ ...form, user_md: e.target.value })}
-                rows={15}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="# User Context&#10;&#10;Information about the human this agent works with..."
-              />
-            </div>
-          )}
-
-          {activeTab === 'agents' && (
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                AGENTS.md - Team Awareness
-              </label>
-              <textarea
-                value={form.agents_md}
-                onChange={(e) => setForm({ ...form, agents_md: e.target.value })}
-                rows={15}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="# Team Roster&#10;&#10;Information about other agents this agent works with..."
-              />
-            </div>
-          )}
-        </form>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-mc-border">
-          <div>
-            {agent && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            )}
+            </TabsContent>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-mc-text-secondary hover:text-mc-text"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </button>
+        </Tabs>
+
+        <DialogFooter className="border-t border-border/60 px-6 py-4">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div>
+              {agent && (
+                <Button type="button" variant="destructive" onClick={handleDelete}>
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
+                <Save className="h-4 w-4" />
+                {isSubmitting ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

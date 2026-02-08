@@ -38,12 +38,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Task not found' }, { status: 404 });
       }
 
-      // Only move to testing if not already in testing, review, or done
-      // (Don't overwrite user's approval or testing results)
-      if (task.status !== 'testing' && task.status !== 'review' && task.status !== 'done') {
+      // Only move to review if not already in review or done
+      if (task.status !== 'review' && task.status !== 'done') {
         run(
           'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
-          ['testing', now, task.id]
+          ['review', now, task.id]
         );
       }
 
@@ -72,8 +71,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         task_id: task.id,
-        new_status: 'testing',
-        message: 'Task moved to testing for automated verification'
+        new_status: 'review',
+        message: 'Task moved to review'
       });
     }
 
@@ -109,7 +108,7 @@ export async function POST(request: NextRequest) {
          FROM tasks t
          LEFT JOIN agents a ON t.assigned_agent_id = a.id
          WHERE t.assigned_agent_id = ? 
-           AND t.status IN ('assigned', 'in_progress')
+           AND t.status IN ('in_progress')
          ORDER BY t.updated_at DESC
          LIMIT 1`,
         [session.agent_id]
@@ -122,12 +121,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Only move to testing if not already in testing, review, or done
-      // (Don't overwrite user's approval or testing results)
-      if (task.status !== 'testing' && task.status !== 'review' && task.status !== 'done') {
+      // Only move to review if not already in review or done
+      if (task.status !== 'review' && task.status !== 'done') {
         run(
           'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
-          ['testing', now, task.id]
+          ['review', now, task.id]
         );
       }
 
@@ -156,8 +154,8 @@ export async function POST(request: NextRequest) {
         task_id: task.id,
         agent_id: session.agent_id,
         summary,
-        new_status: 'testing',
-        message: 'Task moved to testing for automated verification'
+        new_status: 'review',
+        message: 'Task moved to review'
       });
     }
 

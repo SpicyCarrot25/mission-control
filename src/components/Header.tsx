@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, Settings, ChevronLeft, LayoutGrid, Menu } from 'lucide-react';
+import { Zap, Settings, ChevronLeft, LayoutGrid, Menu, Bolt } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface HeaderProps {
   workspace?: Workspace;
@@ -47,16 +49,16 @@ export function Header({ workspace, onToggleSidebar }: HeaderProps) {
 
   const workingAgents = agents.filter((a) => a.status === 'working').length;
   const activeAgents = workingAgents + activeSubAgents;
-  const tasksInQueue = tasks.filter((t) => t.status !== 'done' && t.status !== 'review').length;
+  const tasksInQueue = tasks.filter((t) => t.status !== 'done').length;
 
   return (
-    <header className="h-14 bg-mc-bg-secondary border-b border-mc-border flex items-center justify-between px-4">
+    <header className="flex h-16 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur">
       {/* Left: Logo & Title */}
       <div className="flex items-center gap-3 min-w-0">
         {workspace && (
           <button
             onClick={onToggleSidebar}
-            className="md:hidden p-2 -ml-2 rounded hover:bg-mc-bg-tertiary text-mc-text-secondary"
+            className="md:hidden -ml-2 rounded-md p-2 text-muted-foreground hover:bg-muted"
             aria-label="Toggle sidebar"
             type="button"
           >
@@ -64,10 +66,13 @@ export function Header({ workspace, onToggleSidebar }: HeaderProps) {
           </button>
         )}
         <div className="flex items-center gap-2">
-          <Zap className="w-5 h-5 text-mc-accent-cyan" />
-          <span className="font-semibold text-mc-text uppercase tracking-wider text-sm">
-            Mission Control
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Bolt className="h-5 w-5" />
           </span>
+          <div>
+            <span className="block text-xs uppercase tracking-[0.32em] text-muted-foreground">Nix</span>
+            <span className="text-sm font-semibold">Mission Control</span>
+          </div>
         </div>
 
         {/* Workspace indicator or back to dashboard */}
@@ -75,13 +80,13 @@ export function Header({ workspace, onToggleSidebar }: HeaderProps) {
           <div className="flex items-center gap-2 min-w-0">
             <Link
               href="/"
-              className="flex items-center gap-1 text-mc-text-secondary hover:text-mc-accent transition-colors"
+              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               <LayoutGrid className="w-4 h-4" />
             </Link>
-            <span className="text-mc-text-secondary">/</span>
-            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 bg-mc-bg-tertiary rounded min-w-0">
+            <span className="text-muted-foreground">/</span>
+            <div className="flex items-center gap-2 rounded-full border border-border/60 bg-card px-2 py-1 sm:px-3 min-w-0">
               <span className="text-lg">{workspace.icon}</span>
               <span className="font-medium text-sm sm:text-base truncate">
                 {workspace.name}
@@ -91,7 +96,7 @@ export function Header({ workspace, onToggleSidebar }: HeaderProps) {
         ) : (
           <Link
             href="/"
-            className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded hover:bg-mc-bg transition-colors"
+            className="flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1 transition-colors hover:bg-muted"
           >
             <LayoutGrid className="w-4 h-4" />
             <span className="text-sm">All Workspaces</span>
@@ -101,44 +106,37 @@ export function Header({ workspace, onToggleSidebar }: HeaderProps) {
 
       {/* Center: Stats - only show in workspace view */}
       {workspace && (
-        <div className="hidden md:flex items-center gap-8">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-mc-accent-cyan">{activeAgents}</div>
-            <div className="text-xs text-mc-text-secondary uppercase">Agents Active</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-mc-accent-purple">{tasksInQueue}</div>
-            <div className="text-xs text-mc-text-secondary uppercase">Tasks in Queue</div>
-          </div>
+        <div className="hidden md:flex items-center gap-3">
+          <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
+            <Zap className="h-3 w-3" />
+            {activeAgents} active agents
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+            {tasksInQueue} tasks in flight
+          </Badge>
         </div>
       )}
 
       {/* Right: Time & Status */}
       <div className="flex items-center gap-2 sm:gap-4">
-        <span className="hidden sm:inline text-mc-text-secondary text-sm font-mono">
+        <span className="hidden sm:inline text-muted-foreground text-sm">
           {format(currentTime, 'HH:mm:ss')}
         </span>
-        <div
-          className={`flex items-center gap-2 px-2 sm:px-3 py-1 rounded border text-xs sm:text-sm font-medium ${
-            isOnline
-              ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
-              : 'bg-mc-accent-red/20 border-mc-accent-red text-mc-accent-red'
-          }`}
+        <Badge
+          variant={isOnline ? 'default' : 'destructive'}
+          className="rounded-full px-3 py-1 text-xs"
         >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isOnline ? 'bg-mc-accent-green animate-pulse' : 'bg-mc-accent-red'
-            }`}
-          />
-          {isOnline ? 'ONLINE' : 'OFFLINE'}
-        </div>
-        <button
+          <span className="h-2 w-2 rounded-full bg-current" />
+          {isOnline ? 'Online' : 'Offline'}
+        </Badge>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => router.push('/settings')}
-          className="p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
           title="Settings"
         >
           <Settings className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
     </header>
   );

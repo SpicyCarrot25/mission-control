@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const params: unknown[] = [];
 
     if (status) {
-      // Support comma-separated status values (e.g., status=inbox,testing,in_progress)
+      // Support comma-separated status values (e.g., status=backlog,review,in_progress)
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
       if (statuses.length === 1) {
         sql += ' AND t.status = ?';
@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
     // Transform to include nested agent info
     const transformedTasks = tasks.map((task) => ({
       ...task,
+      subtasks: task.subtasks ? JSON.parse(task.subtasks as unknown as string) : [],
       assigned_agent: task.assigned_agent_id
         ? {
             id: task.assigned_agent_id,
@@ -88,17 +89,23 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
-    const status = (body as { status?: string }).status || 'inbox';
+    const status = (body as { status?: string }).status || 'backlog';
+    const projectTag = body.project_tag || 'General|#f97316';
+    const subtasks = body.subtasks ? JSON.stringify(body.subtasks) : JSON.stringify([]);
     
     run(
-      `INSERT INTO tasks (id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (id, title, description, status, priority, owner, blockers, subtasks, project_tag, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         body.title,
         body.description || null,
         status,
         body.priority || 'normal',
+        body.owner || null,
+        body.blockers || null,
+        subtasks,
+        projectTag,
         body.assigned_agent_id || null,
         body.created_by_agent_id || null,
         workspaceId,
@@ -138,6 +145,12 @@ export async function POST(request: NextRequest) {
       [id]
     );
     
+    if (task) {
+      (task as Task & { subtasks?: Array<{ text: string; done: boolean }> }).subtasks = task.subtasks
+        ? JSON.parse(task.subtasks as unknown as string)
+        : [];
+    }
+
     // Broadcast task creation via SSE
     if (task) {
       broadcast({
@@ -145,7 +158,7 @@ export async function POST(request: NextRequest) {
         payload: task,
       });
     }
-    
+
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     console.error('Failed to create task:', error);

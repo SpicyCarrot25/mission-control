@@ -214,7 +214,7 @@ If planning is complete, respond with JSON:
                 planning_complete = 1,
                 planning_spec = ?,
                 planning_agents = ?,
-                status = 'inbox'
+                status = 'backlog'
             WHERE id = ?
           `).run(
             JSON.stringify(messages),

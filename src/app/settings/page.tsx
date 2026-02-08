@@ -7,8 +7,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings, Save, RotateCcw, Home, FolderOpen, Link as LinkIcon } from 'lucide-react';
+import { Settings, Save, RotateCcw, FolderOpen, Link as LinkIcon } from 'lucide-react';
 import { getConfig, updateConfig, resetConfig, type MissionControlConfig } from '@/lib/config';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -55,45 +59,44 @@ export default function SettingsPage() {
 
   if (!config) {
     return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-mc-text-secondary">Loading settings...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading settings...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-mc-bg">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-mc-border bg-mc-bg-secondary">
+      <div className="border-b border-border/60 bg-card/60">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/')}
-              className="p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
+              className="p-2 hover:bg-muted rounded text-muted-foreground"
               title="Back to Mission Control"
             >
               ← Back
             </button>
-            <Settings className="w-6 h-6 text-mc-accent" />
-            <h1 className="text-xl sm:text-2xl font-bold text-mc-text">Settings</h1>
+            <Settings className="w-6 h-6 text-primary" />
+            <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button
+            <Button
+              variant="outline"
               onClick={handleReset}
-              className="px-3 sm:px-4 py-2 border border-mc-border rounded hover:bg-mc-bg-tertiary text-mc-text-secondary flex items-center gap-2 text-sm"
             >
               <RotateCcw className="w-4 h-4" />
               Reset to Defaults
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-3 sm:px-4 py-2 bg-mc-accent text-mc-bg rounded hover:bg-mc-accent/90 flex items-center gap-2 disabled:opacity-50 text-sm"
             >
               <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -102,127 +105,115 @@ export default function SettingsPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* Success Message */}
         {saveSuccess && (
-          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded text-green-400">
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-300">
             ✓ Settings saved successfully
           </div>
         )}
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded text-red-400">
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded text-destructive">
             ✗ {error}
           </div>
         )}
 
         {/* Workspace Paths */}
-        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <FolderOpen className="w-5 h-5 text-mc-accent" />
-            <h2 className="text-xl font-semibold text-mc-text">Workspace Paths</h2>
-          </div>
-          <p className="text-sm text-mc-text-secondary mb-4">
-            Configure where Mission Control stores projects and deliverables.
-          </p>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
-                Workspace Base Path
-              </label>
-              <input
-                type="text"
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-primary" />
+              Workspace Paths
+            </CardTitle>
+            <CardDescription>
+              Configure where Mission Control stores projects and deliverables.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Workspace Base Path</Label>
+              <Input
                 value={config.workspaceBasePath}
                 onChange={(e) => handleChange('workspaceBasePath', e.target.value)}
                 placeholder="~/Documents/Shared"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
-              <p className="text-xs text-mc-text-secondary mt-1">
+              <p className="text-xs text-muted-foreground">
                 Base directory for all Mission Control files. Use ~ for home directory.
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
-                Projects Path
-              </label>
-              <input
-                type="text"
+            <div className="space-y-2">
+              <Label>Projects Path</Label>
+              <Input
                 value={config.projectsPath}
                 onChange={(e) => handleChange('projectsPath', e.target.value)}
                 placeholder="~/Documents/Shared/projects"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
-              <p className="text-xs text-mc-text-secondary mt-1">
+              <p className="text-xs text-muted-foreground">
                 Directory where project folders are created. Each project gets its own folder.
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
-                Default Project Name
-              </label>
-              <input
-                type="text"
+            <div className="space-y-2">
+              <Label>Default Project Name</Label>
+              <Input
                 value={config.defaultProjectName}
                 onChange={(e) => handleChange('defaultProjectName', e.target.value)}
                 placeholder="mission-control"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
-              <p className="text-xs text-mc-text-secondary mt-1">
+              <p className="text-xs text-muted-foreground">
                 Default name for new projects. Can be changed per project.
               </p>
             </div>
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
         {/* API Configuration */}
-        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <LinkIcon className="w-5 h-5 text-mc-accent" />
-            <h2 className="text-xl font-semibold text-mc-text">API Configuration</h2>
-          </div>
-          <p className="text-sm text-mc-text-secondary mb-4">
-            Configure Mission Control API URL for agent orchestration.
-          </p>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
-                Mission Control URL
-              </label>
-              <input
-                type="text"
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LinkIcon className="h-5 w-5 text-primary" />
+              API Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure Mission Control API URL for agent orchestration.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Mission Control URL</Label>
+              <Input
                 value={config.missionControlUrl}
                 onChange={(e) => handleChange('missionControlUrl', e.target.value)}
                 placeholder="http://localhost:3000"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
-              <p className="text-xs text-mc-text-secondary mt-1">
+              <p className="text-xs text-muted-foreground">
                 URL where Mission Control is running. Auto-detected by default. Change for remote access.
               </p>
             </div>
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
         {/* Environment Variables Note */}
-        <section className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <h3 className="text-lg font-semibold text-blue-400 mb-2">
-            📝 Environment Variables
-          </h3>
-          <p className="text-sm text-blue-300 mb-3">
-            Some settings are also configurable via environment variables in <code className="px-2 py-1 bg-mc-bg rounded">.env.local</code>:
-          </p>
-          <ul className="text-sm text-blue-300 space-y-1 ml-4 list-disc">
+        <Card className="border border-blue-500/30 bg-blue-500/10">
+          <CardHeader>
+            <CardTitle className="text-blue-300">Environment Variables</CardTitle>
+            <CardDescription className="text-blue-200">
+              Some settings are also configurable via environment variables in <code className="px-2 py-1 rounded bg-background/60">.env.local</code>:
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="text-sm text-blue-200 space-y-1 ml-4 list-disc">
             <li><code>MISSION_CONTROL_URL</code> - API URL override</li>
             <li><code>WORKSPACE_BASE_PATH</code> - Base workspace directory</li>
             <li><code>PROJECTS_PATH</code> - Projects directory</li>
             <li><code>OPENCLAW_GATEWAY_URL</code> - Gateway WebSocket URL</li>
             <li><code>OPENCLAW_GATEWAY_TOKEN</code> - Gateway auth token</li>
-          </ul>
-          <p className="text-xs text-blue-400 mt-3">
-            Environment variables take precedence over UI settings for server-side operations.
-          </p>
-        </section>
+            </ul>
+            <p className="text-xs text-blue-200 mt-3">
+              Environment variables take precedence over UI settings for server-side operations.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 export type AgentStatus = 'standby' | 'working' | 'offline';
 
-export type TaskStatus = 'planning' | 'inbox' | 'assigned' | 'in_progress' | 'testing' | 'review' | 'done';
+export type TaskStatus = 'backlog' | 'in_progress' | 'review' | 'done';
 
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -42,6 +42,10 @@ export interface Task {
   description?: string;
   status: TaskStatus;
   priority: TaskPriority;
+  owner?: string;
+  blockers?: string;
+  subtasks?: Array<{ text: string; done: boolean }>;
+  project_tag?: string;
   assigned_agent_id?: string;
   created_by_agent_id?: string;
   workspace_id: string;
@@ -114,11 +118,8 @@ export interface WorkspaceStats {
   slug: string;
   icon: string;
   taskCounts: {
-    planning: number;
-    inbox: number;
-    assigned: number;
+    backlog: number;
     in_progress: number;
-    testing: number;
     review: number;
     done: number;
     total: number;
@@ -236,6 +237,10 @@ export interface CreateTaskRequest {
   title: string;
   description?: string;
   priority?: TaskPriority;
+  owner?: string;
+  blockers?: string;
+  subtasks?: Array<{ text: string; done: boolean }>;
+  project_tag?: string;
   assigned_agent_id?: string;
   created_by_agent_id?: string;
   business_id?: string;

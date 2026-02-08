@@ -48,7 +48,7 @@ const migrations: Migration[] = [
       // Insert default workspace if not exists
       db.exec(`
         INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon) 
-        VALUES ('default', 'Default Workspace', 'default', 'Default workspace', '🏠');
+        VALUES ('default', 'General', 'general', 'Primary workspace', '🧭');
       `);
       
       // Add workspace_id to tasks if not exists
@@ -149,6 +149,116 @@ const migrations: Migration[] = [
       if (!tasksInfo.some(col => col.name === 'planning_agents')) {
         db.exec(`ALTER TABLE tasks ADD COLUMN planning_agents TEXT`);
         console.log('[Migration 004] Added planning_agents');
+      }
+    }
+  },
+  {
+    id: '005',
+    name: 'phase2_task_fields_and_statuses',
+    up: (db) => {
+      console.log('[Migration 005] Updating tasks for Phase 2...');
+
+      const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+      const hasColumn = (name: string) => tasksInfo.some(col => col.name === name);
+
+      if (!hasColumn('owner')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN owner TEXT`);
+      }
+      if (!hasColumn('blockers')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN blockers TEXT`);
+      }
+      if (!hasColumn('subtasks')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN subtasks TEXT`);
+      }
+      if (!hasColumn('project_tag')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN project_tag TEXT`);
+      }
+
+      if (!hasColumn('planning_session_key')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN planning_session_key TEXT`);
+      }
+      if (!hasColumn('planning_messages')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN planning_messages TEXT`);
+      }
+      if (!hasColumn('planning_complete')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN planning_complete INTEGER DEFAULT 0`);
+      }
+      if (!hasColumn('planning_spec')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN planning_spec TEXT`);
+      }
+      if (!hasColumn('planning_agents')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN planning_agents TEXT`);
+      }
+
+      const taskSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
+      if (taskSchema && !taskSchema.sql.includes("'backlog'")) {
+        console.log('[Migration 005] Rebuilding tasks table for new status constraint...');
+        db.exec(`
+          ALTER TABLE tasks RENAME TO tasks_old;
+        `);
+
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS tasks (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            status TEXT DEFAULT 'backlog' CHECK (status IN ('backlog', 'in_progress', 'review', 'done')),
+            priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+            owner TEXT,
+            blockers TEXT,
+            subtasks TEXT,
+            project_tag TEXT,
+            assigned_agent_id TEXT REFERENCES agents(id),
+            created_by_agent_id TEXT REFERENCES agents(id),
+            workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
+            business_id TEXT DEFAULT 'default',
+            due_date TEXT,
+            planning_session_key TEXT,
+            planning_messages TEXT,
+            planning_complete INTEGER DEFAULT 0,
+            planning_spec TEXT,
+            planning_agents TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+          );
+        `);
+
+        db.exec(`
+          INSERT INTO tasks (
+            id, title, description, status, priority, owner, blockers, subtasks, project_tag,
+            assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date,
+            planning_session_key, planning_messages, planning_complete, planning_spec, planning_agents,
+            created_at, updated_at
+          )
+          SELECT
+            id,
+            title,
+            description,
+            CASE
+              WHEN status IN ('in_progress', 'review', 'done') THEN status
+              ELSE 'backlog'
+            END AS status,
+            priority,
+            owner,
+            blockers,
+            subtasks,
+            project_tag,
+            assigned_agent_id,
+            created_by_agent_id,
+            workspace_id,
+            business_id,
+            due_date,
+            planning_session_key,
+            planning_messages,
+            planning_complete,
+            planning_spec,
+            planning_agents,
+            created_at,
+            updated_at
+          FROM tasks_old;
+        `);
+
+        db.exec(`DROP TABLE tasks_old;`);
       }
     }
   }

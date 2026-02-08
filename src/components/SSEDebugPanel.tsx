@@ -79,40 +79,40 @@ export function SSEDebugPanel() {
     <div className="fixed bottom-4 left-4 z-50">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg text-sm"
+        className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-3 py-2 text-sm shadow-lg"
       >
         {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        <span className="text-mc-accent">Debug</span>
-        <span className="bg-mc-accent text-mc-bg px-2 py-0.5 rounded text-xs">
+        <span className="text-primary">Debug</span>
+        <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
           {logs.length}
         </span>
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-12 left-0 w-96 max-h-80 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-mc-border flex justify-between items-center">
+        <div className="absolute bottom-12 left-0 w-96 max-h-80 overflow-hidden rounded-lg border border-border/60 bg-card shadow-xl">
+          <div className="flex items-center justify-between border-b border-border/60 p-2">
             <span className="text-sm font-medium">Debug Events</span>
             <button
               onClick={() => setLogs([])}
-              className="text-xs text-mc-text-secondary hover:text-mc-text"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
             </button>
           </div>
           <div className="overflow-y-auto max-h-64 p-2 space-y-1 font-mono text-xs">
             {logs.length === 0 ? (
-              <div className="text-mc-text-secondary text-center py-4">
+              <div className="text-muted-foreground text-center py-4">
                 Waiting for events...
               </div>
             ) : (
               logs.map((log, i) => (
-                <div key={i} className="p-2 bg-mc-bg rounded border border-mc-border">
-                  <div className="flex justify-between text-mc-text-secondary">
-                    <span className="text-mc-accent">{log.type}</span>
+                <div key={i} className="rounded-md border border-border/60 bg-background/70 p-2">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span className="text-primary">{log.type}</span>
                     <span>{log.timestamp.toLocaleTimeString()}</span>
                   </div>
                   {log.data !== null && log.data !== undefined && (
-                    <pre className="mt-1 text-mc-text overflow-x-auto whitespace-pre-wrap">
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-foreground">
                       {formatLogData(log.data)}
                     </pre>
                   )}

@@ -5,6 +5,8 @@ import { ChevronRight, Clock } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Event } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type FeedFilter = 'all' | 'tasks' | 'agents';
 
@@ -46,43 +48,27 @@ export function LiveFeed() {
     }
   };
 
-  const getEventColor = (type: string) => {
-    switch (type) {
-      case 'task_completed':
-        return 'text-mc-accent-green';
-      case 'task_created':
-        return 'text-mc-accent-pink';
-      case 'task_assigned':
-        return 'text-mc-accent-yellow';
-      case 'message_sent':
-        return 'text-mc-accent';
-      case 'agent_joined':
-        return 'text-mc-accent-cyan';
-      default:
-        return 'text-mc-text-secondary';
-    }
-  };
-
   return (
-    <aside className="hidden lg:flex w-80 bg-mc-bg-secondary border-l border-mc-border flex-col">
+    <aside className="hidden lg:flex w-80 border-l border-border/60 bg-card/60 backdrop-blur flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-mc-border">
-        <div className="flex items-center gap-2 mb-3">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
-          <span className="text-sm font-medium uppercase tracking-wider">Live Feed</span>
+      <div className="p-4 border-b border-border/60">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <ChevronRight className="w-4 h-4" />
+          <span className="uppercase tracking-[0.2em]">Live Feed</span>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex gap-1">
+        <div className="mt-4 flex gap-2">
           {(['all', 'tasks', 'agents'] as FeedFilter[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setFilter(tab)}
-              className={`px-3 py-1 text-xs rounded uppercase ${
+              className={cn(
+                'rounded-full px-3 py-1 text-xs uppercase transition',
                 filter === tab
-                  ? 'bg-mc-accent text-mc-bg font-medium'
-                  : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
-              }`}
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              )}
             >
               {tab}
             </button>
@@ -91,9 +77,9 @@ export function LiveFeed() {
       </div>
 
       {/* Events List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {filteredEvents.length === 0 ? (
-          <div className="text-center py-8 text-mc-text-secondary text-sm">
+          <div className="text-center py-8 text-muted-foreground text-sm">
             No events yet
           </div>
         ) : (
@@ -135,21 +121,19 @@ function EventItem({ event }: { event: Event }) {
 
   return (
     <div
-      className={`p-2 rounded border-l-2 animate-slide-in ${
-        isHighlight
-          ? 'bg-mc-bg-tertiary border-mc-accent-pink'
-          : 'bg-transparent border-transparent hover:bg-mc-bg-tertiary'
-      }`}
+      className={cn(
+        'rounded-xl border border-border/50 bg-background/70 p-3 shadow-sm transition',
+        isHighlight && 'border-primary/40 bg-primary/10'
+      )}
     >
       <div className="flex items-start gap-2">
         <span className="text-sm">{getEventIcon(event.type)}</span>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm ${isTaskEvent ? 'text-mc-accent-pink' : 'text-mc-text'}`}>
-            {event.message}
-          </p>
-          <div className="flex items-center gap-1 mt-1 text-xs text-mc-text-secondary">
+          <p className={cn('text-sm', isTaskEvent && 'text-primary')}>{event.message}</p>
+          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
             <Clock className="w-3 h-3" />
             {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+            {isTaskEvent && <Badge variant="secondary" className="rounded-full px-2 py-0.5">Task</Badge>}
           </div>
         </div>
       </div>
