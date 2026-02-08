@@ -94,11 +94,11 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
   ] as const;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-none sm:rounded-lg w-full h-full sm:h-auto max-w-2xl sm:max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-base sm:text-lg font-semibold">
             {agent ? `Edit ${agent.name}` : 'Create New Agent'}
           </h2>
           <button
@@ -110,12 +110,12 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-mc-border">
+        <div className="flex border-b border-mc-border overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-mc-accent text-mc-accent'
                   : 'border-transparent text-mc-text-secondary hover:text-mc-text'

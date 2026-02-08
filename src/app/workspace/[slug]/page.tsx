@@ -17,6 +17,7 @@ import type { Task, Workspace } from '@/lib/types';
 export default function WorkspacePage() {
   const params = useParams();
   const slug = params.slug as string;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const {
     setAgents,
@@ -199,11 +200,28 @@ export default function WorkspacePage() {
 
   return (
     <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
-      <Header workspace={workspace} />
+      <Header
+        workspace={workspace}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+      />
 
       <div className="flex-1 flex overflow-hidden">
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         {/* Agents Sidebar */}
-        <AgentsSidebar workspaceId={workspace.id} />
+        <div
+          className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 md:static md:translate-x-0 md:z-auto md:flex-shrink-0 ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <AgentsSidebar workspaceId={workspace.id} />
+        </div>
 
         {/* Main Content Area */}
         <MissionQueue workspaceId={workspace.id} />

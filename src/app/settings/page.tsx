@@ -65,7 +65,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-mc-bg">
       {/* Header */}
       <div className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/')}
@@ -75,13 +75,13 @@ export default function SettingsPage() {
               ← Back
             </button>
             <Settings className="w-6 h-6 text-mc-accent" />
-            <h1 className="text-2xl font-bold text-mc-text">Settings</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-mc-text">Settings</h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleReset}
-              className="px-4 py-2 border border-mc-border rounded hover:bg-mc-bg-tertiary text-mc-text-secondary flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 border border-mc-border rounded hover:bg-mc-bg-tertiary text-mc-text-secondary flex items-center gap-2 text-sm"
             >
               <RotateCcw className="w-4 h-4" />
               Reset to Defaults
@@ -89,7 +89,7 @@ export default function SettingsPage() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-4 py-2 bg-mc-accent text-mc-bg rounded hover:bg-mc-accent/90 flex items-center gap-2 disabled:opacity-50"
+              className="px-3 sm:px-4 py-2 bg-mc-accent text-mc-bg rounded hover:bg-mc-accent/90 flex items-center gap-2 disabled:opacity-50 text-sm"
             >
               <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : 'Save Changes'}
@@ -99,7 +99,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* Success Message */}
         {saveSuccess && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded text-green-400">

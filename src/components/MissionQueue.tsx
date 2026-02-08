@@ -26,6 +26,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [activeColumnIndex, setActiveColumnIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   const getTasksByStatus = (status: TaskStatus) =>
     tasks.filter((task) => task.status === status);
@@ -77,6 +79,26 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     setDraggedTask(null);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0]?.clientX ?? null);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const endX = e.changedTouches[0]?.clientX ?? touchStartX;
+    const delta = endX - touchStartX;
+    const threshold = 60;
+    if (Math.abs(delta) > threshold) {
+      if (delta < 0 && activeColumnIndex < COLUMNS.length - 1) {
+        setActiveColumnIndex(activeColumnIndex + 1);
+      }
+      if (delta > 0 && activeColumnIndex > 0) {
+        setActiveColumnIndex(activeColumnIndex - 1);
+      }
+    }
+    setTouchStartX(null);
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
@@ -94,8 +116,74 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </button>
       </div>
 
-      {/* Kanban Columns */}
-      <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
+      {/* Mobile Kanban Tabs */}
+      <div className="md:hidden border-b border-mc-border">
+        <div className="flex gap-2 px-3 py-2 overflow-x-auto">
+          {COLUMNS.map((column, index) => {
+            const columnTasks = getTasksByStatus(column.id);
+            const isActive = index === activeColumnIndex;
+            return (
+              <button
+                key={column.id}
+                onClick={() => setActiveColumnIndex(index)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium uppercase whitespace-nowrap ${
+                  isActive
+                    ? 'bg-mc-accent text-mc-bg'
+                    : 'bg-mc-bg-tertiary text-mc-text-secondary'
+                }`}
+              >
+                <span>{column.label}</span>
+                <span className="bg-black/20 text-[10px] px-2 py-0.5 rounded-full">
+                  {columnTasks.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mobile Kanban Column */}
+      <div
+        className="md:hidden flex-1 p-3 overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {COLUMNS.map((column, index) => {
+          if (index !== activeColumnIndex) return null;
+          const columnTasks = getTasksByStatus(column.id);
+          return (
+            <div
+              key={column.id}
+              className={`h-full flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 ${column.color}`}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, column.id)}
+            >
+              <div className="p-3 border-b border-mc-border flex items-center justify-between">
+                <span className="text-xs font-medium uppercase text-mc-text-secondary">
+                  {column.label}
+                </span>
+                <span className="text-xs bg-mc-bg-tertiary px-2 py-0.5 rounded text-mc-text-secondary">
+                  {columnTasks.length}
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                {columnTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onDragStart={handleDragStart}
+                    onClick={() => setEditingTask(task)}
+                    isDragging={draggedTask?.id === task.id}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Kanban Columns */}
+      <div className="hidden md:flex flex-1 gap-3 p-3 overflow-x-auto">
         {COLUMNS.map((column) => {
           const columnTasks = getTasksByStatus(column.id);
           return (
@@ -172,19 +260,19 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
       draggable
       onDragStart={(e) => onDragStart(e, task)}
       onClick={onClick}
-      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 ${
+      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 touch-manipulation active:scale-[0.99] ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
       {/* Drag handle bar */}
-      <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center justify-center py-2 border-b border-mc-border/30 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
         <GripVertical className="w-4 h-4 text-mc-text-secondary/50 cursor-grab" />
       </div>
 
       {/* Card content */}
-      <div className="p-4">
+      <div className="p-5 md:p-4">
         {/* Title */}
-        <h4 className="text-sm font-medium leading-snug line-clamp-2 mb-3">
+        <h4 className="text-base md:text-sm font-medium leading-snug line-clamp-2 mb-3">
           {task.title}
         </h4>
         
@@ -198,9 +286,9 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
 
         {/* Assigned agent */}
         {task.assigned_agent && (
-          <div className="flex items-center gap-2 mb-3 py-1.5 px-2 bg-mc-bg-tertiary/50 rounded">
+          <div className="flex items-center gap-2 mb-3 py-2 px-2 bg-mc-bg-tertiary/50 rounded">
             <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
-            <span className="text-xs text-mc-text-secondary truncate">
+            <span className="text-sm md:text-xs text-mc-text-secondary truncate">
               {(task.assigned_agent as unknown as { name: string }).name}
             </span>
           </div>
@@ -210,11 +298,11 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
         <div className="flex items-center justify-between pt-2 border-t border-mc-border/20">
           <div className="flex items-center gap-1.5">
             <div className={`w-1.5 h-1.5 rounded-full ${priorityDots[task.priority]}`} />
-            <span className={`text-xs capitalize ${priorityStyles[task.priority]}`}>
+            <span className={`text-sm md:text-xs capitalize ${priorityStyles[task.priority]}`}>
               {task.priority}
             </span>
           </div>
-          <span className="text-[10px] text-mc-text-secondary/60">
+          <span className="text-xs md:text-[10px] text-mc-text-secondary/60">
             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
           </span>
         </div>

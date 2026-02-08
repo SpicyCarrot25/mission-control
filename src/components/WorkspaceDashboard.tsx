@@ -43,15 +43,15 @@ export function WorkspaceDashboard() {
     <div className="min-h-screen bg-mc-bg">
       {/* Header */}
       <header className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🦞</span>
-              <h1 className="text-xl font-bold">Mission Control</h1>
+              <h1 className="text-lg sm:text-xl font-bold">Mission Control</h1>
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 text-sm"
             >
               <Plus className="w-4 h-4" />
               New Workspace
@@ -61,10 +61,10 @@ export function WorkspaceDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">All Workspaces</h2>
-          <p className="text-mc-text-secondary">
+          <h2 className="text-xl sm:text-2xl font-bold mb-2">All Workspaces</h2>
+          <p className="text-sm sm:text-base text-mc-text-secondary">
             Select a workspace to view its mission queue and agents
           </p>
         </div>
@@ -73,12 +73,12 @@ export function WorkspaceDashboard() {
           <div className="text-center py-16">
             <Folder className="w-16 h-16 mx-auto text-mc-text-secondary mb-4" />
             <h3 className="text-lg font-medium mb-2">No workspaces yet</h3>
-            <p className="text-mc-text-secondary mb-6">
+            <p className="text-sm sm:text-base text-mc-text-secondary mb-6">
               Create your first workspace to get started
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+              className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 text-sm sm:text-base"
             >
               Create Workspace
             </button>
@@ -193,8 +193,8 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
 
     {/* Delete Confirmation Modal */}
     {showDeleteConfirm && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(false)}>
-        <div className="bg-mc-bg-secondary border border-mc-border rounded-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4" onClick={() => setShowDeleteConfirm(false)}>
+        <div className="bg-mc-bg-secondary border border-mc-border rounded-none sm:rounded-xl w-full h-full sm:h-auto max-w-md p-6" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-mc-accent-red/20 rounded-full">
               <AlertTriangle className="w-6 h-6 text-mc-accent-red" />
@@ -272,13 +272,13 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-none sm:rounded-xl w-full h-full sm:h-auto max-w-md flex flex-col">
         <div className="p-6 border-b border-mc-border">
           <h2 className="text-lg font-semibold">Create New Workspace</h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Icon selector */}
           <div>
             <label className="block text-sm font-medium mb-2">Icon</label>
